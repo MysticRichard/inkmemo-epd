@@ -79,6 +79,7 @@ git clone https://github.com/MysticRichard/inkmemo-epd.git
 cd inkmemo-epd
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe -m playwright install msedge
 ```
 
@@ -119,6 +120,7 @@ python -m venv .venv
 ### 打包
 
 ```powershell
+.\.venv\Scripts\python.exe -m pip install pyinstaller
 .\scripts\build.ps1
 ```
 
