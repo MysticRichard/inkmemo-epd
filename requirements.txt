@@ -1,0 +1,8 @@
+bleak==3.0.2
+lunardate==0.3.0
+openpyxl==3.1.5
+pillow==13.0.0
+playwright==1.64.1
+pystray==0.19.5
+pytest==9.2.0
+winrt-Windows.Devices.Geolocation==4!10.0.28000.2957

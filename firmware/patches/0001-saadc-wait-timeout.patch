@@ -1,0 +1,76 @@
+diff --git a/EPD/EPD_driver.c b/EPD/EPD_driver.c
+index eba894c..8963574 100644
+--- a/EPD/EPD_driver.c
++++ b/EPD/EPD_driver.c
+@@ -436,9 +436,30 @@ void EPD_LED_BLINK(void) {
+  * - 输入: VDD的1/3分压 - Input: VDD with 1/3 prescaling
+  * - 参考电压: VBG(1.2V) - Reference: VBG (1.2V)
+  */
++/**
++ * 等待SAADC事件标志,带超时
++ * Wait for a SAADC event flag with a bounded timeout.
++ *
++ * 无超时的忙等会永久阻塞BLE命令队列,导致后续REFRESH(0x05)永远不执行。
++ * Without a timeout this spin blocks the BLE command queue forever,
++ * so REFRESH (0x05) never runs and the panel stays blank.
++ */
++static bool saadc_wait_event(volatile uint32_t* p_event, uint16_t timeout_ms) {
++    while (*p_event == 0) {
++        if (timeout_ms-- == 0) return false;
++        delay(1);
++    }
++    *p_event = 0;
++    return true;
++}
++
+ uint16_t EPD_ReadVoltage(void) {
+     // 使用SAADC - Uses SAADC
+     volatile int16_t value = 0;
++    uint16_t millivolts = 0;
++    // 超时时沿用上一次有效读数: 返回0会被判为"临界电量"并触发关机
++    // Fall back to the last good reading; 0 mV would trigger the shutdown path.
++    static uint16_t last_good_mv = 3300;
+     // 设置10位分辨率 - Set 10-bit resolution
+     NRF_SAADC->RESOLUTION = SAADC_RESOLUTION_VAL_10bit;
+     // 使能SAADC - Enable SAADC
+@@ -456,24 +477,27 @@ uint16_t EPD_ReadVoltage(void) {
+     NRF_SAADC->RESULT.PTR = (uint32_t)&value;                // 结果存储地址 - Result storage address
+     NRF_SAADC->RESULT.MAXCNT = 1;                            // 最大采样数 - Max sample count
+     NRF_SAADC->TASKS_START = 0x01UL;                         // 启动ADC - Start ADC
+-    while (!NRF_SAADC->EVENTS_STARTED);                      // 等待启动完成 - Wait for start
+-    NRF_SAADC->EVENTS_STARTED = 0x00UL;
++    if (!saadc_wait_event(&NRF_SAADC->EVENTS_STARTED, 20)) goto done;  // 等待启动完成 - Wait for start
+     NRF_SAADC->TASKS_SAMPLE = 0x01UL;                        // 开始采样 - Start sampling
+-    while (!NRF_SAADC->EVENTS_END);                          // 等待采样完成 - Wait for completion
+-    NRF_SAADC->EVENTS_END = 0x00UL;
++    if (!saadc_wait_event(&NRF_SAADC->EVENTS_END, 20)) goto done;      // 等待采样完成 - Wait for completion
+     NRF_SAADC->TASKS_STOP = 0x01UL;                          // 停止ADC - Stop ADC
+-    while (!NRF_SAADC->EVENTS_STOPPED);                      // 等待停止完成 - Wait for stop
+-    NRF_SAADC->EVENTS_STOPPED = 0x00UL;
++    if (!saadc_wait_event(&NRF_SAADC->EVENTS_STOPPED, 20)) goto done;  // 等待停止完成 - Wait for stop
+     if (value < 0) value = 0;                                // 处理负值 - Handle negative values
+-    NRF_SAADC->ENABLE = (SAADC_ENABLE_ENABLE_Disabled << SAADC_ENABLE_ENABLE_Pos); // 禁用SAADC - Disable SAADC
+-    NRF_LOG_DEBUG("ADC value: %d\n", value);
+     // Return voltage in millivolts (mV)
+     // 返回电压值(单位:毫伏)
+-    // Original: (value * 3.6V) / 1024 returns volts
+-    // 原公式: (value * 3.6V) / 1024 返回伏特
+-    // New: (value * 3600mV) / 1024 returns millivolts
+-    // 新公式: (value * 3600mV) / 1024 返回毫伏
+-    return (uint16_t)((value * 3600) / 1024);
++    // (value * 3600mV) / 1024
++    millivolts = (uint16_t)((value * 3600) / 1024);
++
++done:
++    NRF_SAADC->ENABLE = (SAADC_ENABLE_ENABLE_Disabled << SAADC_ENABLE_ENABLE_Pos); // 禁用SAADC - Disable SAADC
++    if (millivolts == 0) {
++        NRF_LOG_WARNING("SAADC timeout, keeping last known voltage\n");
++        millivolts = last_good_mv;
++    } else {
++        last_good_mv = millivolts;
++    }
++    NRF_LOG_DEBUG("ADC value: %d, %d mV\n", value, millivolts);
++    return millivolts;
+ }
+ 
+ // Cached voltage value in mV (updated during screen refresh)

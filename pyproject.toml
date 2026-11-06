@@ -1,0 +1,31 @@
+[project]
+name = "inkmemo"
+version = "0.1.0"
+description = "InkMemo Windows WPS-to-nRF_EPD dashboard"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "bleak==3.0.2",
+  "lunardate==0.3.0",
+  "openpyxl==3.1.5",
+  "pillow==13.0.0",
+  "playwright==1.64.1",
+  "pystray==0.19.5",
+  "winrt-Windows.Devices.Geolocation==4!10.0.28000.2957",
+]
+
+[project.optional-dependencies]
+test = ["pytest==9.2.0"]
+build = ["pyinstaller==6.22.3"]
+
+[project.scripts]
+inkmemo = "inkmemo.__main__:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

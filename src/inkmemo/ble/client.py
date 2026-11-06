@@ -37,6 +37,17 @@ class BleTransferError(RuntimeError):
 
 _log = logging.getLogger("inkmemo.ble")
 
+
+async def scan_boards(timeout: float = 15.0) -> list[str]:
+    """Return the broadcast names of nearby nRF_EPD boards."""
+    devices = await BleakScanner.discover(timeout=timeout, return_adv=True)
+    names = set()
+    for device, adv in devices.values():
+        name = device.name or adv.local_name
+        if name and name.startswith("NRF_EPD_"):
+            names.add(name)
+    return sorted(names)
+
 # WinRT 的 GATT 连接、服务发现和写入都不自带超时；卡住时必须由我们兜底，
 # 否则进程会一直挂在半开链路上，只能重启电脑蓝牙才能恢复。
 SCAN_SLACK = 5.0

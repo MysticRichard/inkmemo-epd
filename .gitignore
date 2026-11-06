@@ -1,0 +1,51 @@
+# Local secrets and runtime state
+.env
+.env.*
+*.local
+*.local.json
+*.log
+logs/
+state/
+previews/
+*.session
+*.cookies
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build*/
+dist*/
+*.egg-info/
+*.spec
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 本地协作规则（含个人知识库路径），不入库
+AGENTS.md
+
+# 设计过程稿含真实样例数据，只保留运行时需要的三个模板
+design/approved/compact-v0.8/
+design/approved/compact-v0.15/
+design/approved/relaxed-v0.14/
+design/approved/relaxed-v0.15/
+design/approved/standard-v0.6/
+design/approved/standard-v0.7/
+design/approved/standard-v0.8/
+design/approved/standard-v0.9/
+design/approved/standard-v0.11/*
+design/approved/relaxed-v0.16/*
+design/approved/compact-v0.13/*
+!design/approved/standard-v0.11/source.html
+!design/approved/relaxed-v0.16/source.html
+!design/approved/compact-v0.13/source24.html
+design/mockups/

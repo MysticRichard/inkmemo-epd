@@ -3,7 +3,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
+import subprocess
 import sys
+import traceback
+from datetime import datetime
 from pathlib import Path
 
 from .ble.lease import BleLeaseBusy, acquire_ble_lease
@@ -16,7 +20,22 @@ from .storage import (
     reset_source_cache,
     validate_wps_url,
 )
-from .windows import SingleInstance, request_settings, set_autostart
+from .windows import SingleInstance, create_desktop_shortcut, request_settings, set_autostart
+
+
+def _startup_trace(note: str) -> None:
+    # Autostart failures are invisible in a windowed build: log the fact that
+    # the process was reached before anything else can fail.
+    try:
+        path = APP_DIR / "startup.log"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(
+                f"{datetime.now().astimezone().isoformat()} pid={os.getpid()} "
+                f"cwd={os.getcwd()} {note}\n"
+            )
+    except Exception:
+        pass
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -125,11 +144,17 @@ async def _calibrate() -> int:
 def _run_tray() -> int:
     from .ui import InkMemoApp
 
+    _startup_trace("tray start")
     instance = SingleInstance()
     if not instance.acquire():
+        _startup_trace("secondary instance; settings requested")
         request_settings()
         return 0
     try:
+        try:
+            create_desktop_shortcut()
+        except Exception:
+            _startup_trace("desktop shortcut failed:\n" + traceback.format_exc())
         loop_service = SyncService()
         app = InkMemoApp(loop_service)
         app.service.notify = app.notify
@@ -143,7 +168,11 @@ def _run_tray() -> int:
 
             threading.Thread(target=open_first_run, daemon=True).start()
         app.run()
+        _startup_trace("tray exited")
         return 0
+    except Exception:
+        _startup_trace("tray crashed:\n" + traceback.format_exc())
+        raise
     finally:
         instance.release()
 
@@ -220,7 +249,20 @@ def main() -> int:
         return 0
     if command == "autostart":
         enabled = args.state == "on"
-        set_autostart(enabled)
+        try:
+            set_autostart(enabled)
+        except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+            message = f"登录自启设置失败，未保存本次设置。\n{error}"
+            if getattr(sys, "frozen", False):
+                from tkinter import messagebox
+
+                messagebox.showerror("墨笺 InkMemo 自启设置失败", message)
+            else:
+                print(json.dumps(
+                    {"ok": False, "stage": "autostart", "message": message},
+                    ensure_ascii=False,
+                ))
+            return 1
         settings = Settings.load()
         settings.autostart = enabled
         settings.save()

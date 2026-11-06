@@ -339,7 +339,8 @@ class SyncService:
                 display_health="kept_previous",
                 last_error_class="ble_not_found",
             )
-            self.notify("未发现看板", f"未发现 {self.settings.device_name}，屏幕保持原画面")
+            target = self.settings.device_name or "目标看板"
+            self.notify("未发现看板", f"未发现 {target}，屏幕保持原画面")
             return SyncResult(False, "ble", "未发现目标看板", task_count=len(tasks), layout=preview.layout)
         except LowBattery as exc:
             self.state.update(
